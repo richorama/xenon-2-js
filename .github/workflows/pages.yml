@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       asset_release_tag:
-        description: Release tag with the redistribution-cleared pages-assets.zip
+        description: Release tag with the redistribution-cleared game-assets.bin
         required: true
         type: string
 
@@ -32,9 +32,8 @@ jobs:
         run: |
           test -n "$ASSET_RELEASE_TAG"
           test "$(gh release view --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft -- "$ASSET_RELEASE_TAG")" = false
-          gh release download --repo "$GITHUB_REPOSITORY" --pattern pages-assets.zip --dir "$RUNNER_TEMP" -- "$ASSET_RELEASE_TAG"
-          python3 -m zipfile -e "$RUNNER_TEMP/pages-assets.zip" "$RUNNER_TEMP/pages-assets"
-          npm run build:dist -- "$RUNNER_TEMP/pages-assets"
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern game-assets.bin --dir "$RUNNER_TEMP" -- "$ASSET_RELEASE_TAG"
+          npm run build:dist -- --bundle "$RUNNER_TEMP/game-assets.bin"
       - uses: actions/upload-pages-artifact@v5.0.0
         with:
           path: dist

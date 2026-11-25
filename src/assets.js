@@ -47,6 +47,10 @@ export async function loadAssets(onProgress = () => {}) {
     onProgress(++loaded, DOS_ASSET_PATHS.length);
     return bytes;
   }));
+  return decodeAssets(files);
+}
+
+export function decodeAssets(files) {
   const [exe, global, weapons, shop] = files;
   const shared = decodeSprites(unpack(global), 32);
   const weaponBank = decodeSprites(unpack(weapons), 32);
@@ -59,6 +63,5 @@ export async function loadAssets(onProgress = () => {}) {
     shopArt: decodeShopArt(exe, graphics, shopSprites),
     runScreenArt: decodeRunScreenArt(exe, graphics),
     advice: decodeAdvice(exe),
-    audio: exe.slice(0x800 + 0x14b90, 0x800 + 0x15650),
   };
 }

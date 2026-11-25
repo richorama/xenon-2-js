@@ -1,4 +1,5 @@
 import { loadAssets } from "./assets.js";
+import { loadAssetBundle } from "./asset-bundle.js";
 import { Game, TICK_RATE } from "./game.js";
 import { Renderer } from "./renderer.js";
 import { AmigaAudio } from "./amiga-audio.js";
@@ -8,6 +9,7 @@ const $ = (id) => document.getElementById(id);
 const canvas = $("game");
 const overlay = $("overlay");
 const launch = $("launch");
+const bundlePath = document.querySelector('meta[name="xenon-assets"]')?.content;
 const player = $("player");
 const menu = $("menu-panel");
 const menuChoices = [...menu.children];
@@ -23,7 +25,11 @@ let firePointer;
 let diveRequested = false;
 let scoreStep = 0;
 let scoreConfirm = false;
-const audio = new AmigaAudio({ onState: updateSoundButton });
+let bundledAudio;
+const audio = new AmigaAudio({
+  onState: updateSoundButton,
+  loadTrack: bundlePath ? (name) => bundledAudio[name].slice().buffer : undefined,
+});
 
 function updateAudio() {
   audio.setActive(Boolean(game && !["ready", "menu", "paused"].includes(game.status) && !document.hidden));
@@ -40,7 +46,7 @@ function updateSoundButton() {
   $("sound").textContent = failed ? "AUDIO UNAVAILABLE" : !audio.enabled ? "SOUND OFF"
     : audio.state === "loading" ? "LOADING AUDIO" : "SOUND ON";
   $("sound").setAttribute("aria-pressed", String(audio.enabled && !failed));
-  $("sound").title = failed ? `${audio.error.message}. Check the recovered files in amiga/audio.`
+  $("sound").title = failed ? audio.error.message
     : "Toggle recovered Amiga music and effects (M)";
 }
 
@@ -515,9 +521,15 @@ function animate(time) {
 }
 
 try {
-  const assets = await loadAssets((loaded, total) => {
+  const progress = (loaded, total) => {
     $("load-count").textContent = `${loaded} / ${total}`;
-  });
+  };
+  let assets;
+  if (bundlePath) {
+    progress(0, 1);
+    ({ assets, audio: bundledAudio } = await loadAssetBundle(new URL(bundlePath, document.baseURI)));
+    progress(1, 1);
+  } else assets = await loadAssets(progress);
   renderer = new Renderer(canvas, assets);
   game = new Game(assets);
   game.openAttract();
@@ -530,7 +542,9 @@ try {
 } catch (error) {
   $("overlay-title").textContent = "UNABLE TO START";
   $("load-error").hidden = false;
-  $("load-error").textContent = `${error.message}. Run npm start from this folder, then open the printed local URL. Keep the original game data files in place.`;
+  $("load-error").textContent = bundlePath
+    ? `${error.message}. Keep the game asset bundle beside index.html and serve the folder over HTTP.`
+    : `${error.message}. Run npm start from this folder, then open the printed local URL. Keep the original game data files in place.`;
   launch.hidden = true;
   console.error(error);
 }

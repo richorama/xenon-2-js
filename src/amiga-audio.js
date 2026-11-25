@@ -15,10 +15,16 @@ export class AmigaAudio {
       return new Context();
     },
     fetch = (...args) => globalThis.fetch(...args),
+    loadTrack = async (name) => {
+      const path = AMIGA_AUDIO_PATHS[name];
+      const response = await fetch(new URL(`../${path}`, import.meta.url));
+      if (!response.ok) throw new Error(`Could not load Amiga audio: ${path.split("/").at(-1)}`);
+      return response.arrayBuffer();
+    },
     onState = () => {},
   } = {}) {
     this.createContext = createContext;
-    this.fetch = fetch;
+    this.loadTrack = loadTrack;
     this.onState = onState;
     this.enabled = true;
     this.active = false;
@@ -52,10 +58,8 @@ export class AmigaAudio {
       const resumed = this.context.resume();
       if (!this.loading) {
         this.notify("loading");
-        this.loading = Promise.all(Object.entries(AMIGA_AUDIO_PATHS).map(async ([name, path]) => {
-          const response = await this.fetch(new URL(`../${path}`, import.meta.url));
-          if (!response.ok) throw new Error(`Could not load Amiga audio: ${path.split("/").at(-1)}`);
-          const buffer = await this.context.decodeAudioData(await response.arrayBuffer());
+        this.loading = Promise.all(Object.keys(AMIGA_AUDIO_PATHS).map(async (name) => {
+          const buffer = await this.context.decodeAudioData(await this.loadTrack(name));
           return [name, buffer];
         })).then((entries) => {
           this.buffers = new Map(entries);

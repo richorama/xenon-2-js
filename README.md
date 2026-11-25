@@ -1,16 +1,13 @@
 # 🚀 Xenon 2: Megablast in your browser
 
-Blast through five stages, spend your credits at Colin's shop, and see how far
-you get in the harder second round. Play solo or take turns with a friend.
+A native JavaScript and Canvas 2D port of **Xenon 2: Megablast**, with all five
+stages and local two-player play. No emulator or build step is needed to play
+locally.
 
-This is a native JavaScript and Canvas 2D reconstruction, not a DOS emulator.
-A [Chromium replay using only gameplay inputs](#validate) cleared all five
-stages and flew into round two. It plays through to the ending, but it doesn't
-match the DOS game frame for frame.
+![Stage-one gameplay in the browser port](docs/gameplay.png)
 
-**💾 Bring your own DOS game files.** The game decodes them locally as it
-starts. They're not included in this repository or hosted as a standalone
-web build.
+**💾 Bring your own DOS game files.** The game data and audio aren't included in
+this repository, and no public build is hosted.
 
 ## Run
 
@@ -32,7 +29,8 @@ Open <http://127.0.0.1:8080>. There's nothing to install or build. The server
 only listens on your machine; use `PORT=8081 npm start` for a different port.
 
 🎵 Sound is optional. See [Recovered Amiga audio](#recovered-amiga-audio) to
-add the soundtrack and effects.
+add the soundtrack and effects. To package the game for a static server,
+see [Build a standalone folder](#build-a-standalone-folder).
 
 ## 🎮 Controls
 
@@ -49,105 +47,9 @@ tap the option directly. On **Get Ready**, press **Enter / Space** or tap
 | Fullscreen | F to toggle; Esc to exit | **Fullscreen / Exit Fullscreen** |
 | Restart / sound | R / M | **Restart / Sound** outside fullscreen |
 
-Tip: hold **Down at the bottom edge** to backtrack up to 16 pixels. The game
-pauses if its window loses focus. If audio is installed, pausing stops effects
-and lets the music resume where it left off; restarting keeps your mute setting.
-
-### Lives, scores and two players
-
-When you lose a life, you return to the last checkpoint with the equipment and
-credits it saved. After the last life, press **Enter / Space** or tap
-**Continue** before the countdown ends: you get three lives but lose your
-score. You start with two continues and earn one more each time you clear the
-campaign.
-
-If you qualify for the high-score board, use **Left / Right** to change a letter
-and **Enter / Space** to confirm. On touch, tap the left or right third to
-change the letter, or the middle to confirm. The toolbars stay hidden during
-initials entry. **High Scores** is available from the title screen; scores last
-until you reload the page.
-
-Choose **2 Player Game** to take turns on the same controls. Each player keeps
-their own lives, continues, equipment and checkpoints. Losing a life passes
-control to the other player unless they've already finished the stage or are
-out of the game. The next stage starts once both surviving players finish.
-
-<details>
-<summary>Campaign walkthrough (boss spoilers)</summary>
-
-**Stage one** opens Colin's shop at its original mid-level world-position trigger
-(roughly two minutes in, depending on movement). Continue resumes the same stage
-and equipment. Stage one continues to its original boss: damage its glowing
-eye, avoid the articulated tentacle, and collect the credit burst after defeating
-it. The next-stage shop waits until those counted credits are collected or expire.
-Before the first shop, rotating terrain openings release segmented worms.
-Each part can be destroyed individually; heads are worth 250 points and
-segments 50.
-
-**Stage two** runs its original animated hatches: large/small creatures emerge
-twice, climb into position and dive at the ship; other pods open into eight-way
-swarms that periodically re-aim and expire. The hatch machinery is map scenery,
-not a damageable enemy, so Z clears released creatures without disabling it.
-Stage two's three-eye miniboss blocks further progress. Destroy the segmented
-attackers' heads to make its eyes vulnerable, attack each side from that half of
-the screen, then follow the forced backscroll to its centre eye. Destroying all
-three releases the camera and ten credit globes; the same-stage shop waits until
-those globes are collected or expire.
-After that shop, stage two continues to its 75-health final boss. Approach
-upward to activate it, use backscroll to keep its mouth in view, and shoot that
-weak point while avoiding downward shots and sixteen-way volleys. Its eggs hatch
-into armed crawlers that repair broken arena walls. Defeating it releases twenty
-counted credit globes before the stage-three shop.
-
-**Stage three** includes retracting eight-part wall arms, attacking skaters,
-wall-following crawlers and two-stage terrain turrets. Destroy a turret's lower
-gun to expose its separately damageable, eight-way-firing core. Its 17-part
-miniboss locks the camera at 2800: shoot its two eyes while they open, avoid its
-articulated claws and aimed shots, then collect or wait out ten credit globes
-before the same-stage shop. Each eye has twenty health; its body and claws are
-indestructible. Its final encounter is an eleven-part worm with an 80-health
-head, delayed body segments, repeated paths and eight-way fire. Its body absorbs
-shots; defeating its head releases twenty counted credits before the stage-four
-shop.
-**Stage four** includes extending wall rams and hunters that emerge from wall
-hatches. Its twenty-part miniboss locks the camera: destroy the trailing end
-of the sweeping arm and four fixed guns, then backtrack to the exposed core.
-Ten counted credits gate the same-stage shop. The final boss has a sweeping
-beam and two turrets; destroy both turrets before attacking the core. Twenty
-counted credits gate the stage-five shop.
-
-**Stage five** adds wall patrols that launch homing enemies and three ten-ship
-formations that fire rings. Its moving miniboss exposes a small core; its four
-guns can be destroyed separately. The miniboss's ten credits lead back to
-Colin's shop. At the final arena, destroy all eighteen defenses, then hold
-**Down at the bottom edge** to backtrack if the exposed core has scrolled out of
-view. Collect or wait out its twenty credits to see the victory sequence.
-
-Afterward, the game loops to stage one with tougher ordinary enemies and a fresh
-starter gun in place of the previous loadout. Health, lives and score carry
-forward. Between stages of the same round, equipment also carries forward.
-Entering a new stage or round resets credits.
-
-</details>
-
-### Shop and power-ups
-
-The original stage-specific minimum shop balances are applied to low funds.
-The shop fills the game canvas with the original cabinet, twenty animated
-equipment displays, Colin, shutters, pixel dialogue, credits and action buttons.
-Use arrows/WASD and Enter/Space, or tap the original displays/buttons. Select an
-item to quote it, then select it again or use SELL or BUY to confirm. EXIT
-finishes selling first; EXIT on the buying screen resumes flight. MORE pages
-later stock when available.
-Stock respects the original visit budget and your balance; a large wallet does
-not unlock equipment the current visit does not stock.
-Super Nashwan temporarily loans powered double shot, two cannons, two lasers,
-a trailing twelve-way-firing drone and side shots. Your actual equipment is
-restored after 170 gameplay ticks (about 9.3 seconds), not replaced permanently.
-Supply containers also open on ship contact, costing eight energy unless protected;
-a fatal hit does not open them. The Z pickup damages active enemies, including
-wall guns and patrols, but not bosses, and opens remaining supply containers.
-Restart resets the run. Remaining shop-sequence and equipment quirks are noted below.
+The same controls work in the shop. For high-score initials, use
+**Left / Right** and **Enter / Space**. On touch, tap the left or right third
+to change the letter, or the middle to confirm.
 
 ## Recovered Amiga audio
 
@@ -572,7 +474,7 @@ shop/death handling and timed restoration.
 Stage-four regressions cover the wall actors, pre-steering hull contact, two
 boss vulnerability gates, forced backtracking, rewards and both shop transitions.
 
-The **331-test Node suite** includes a scripted campaign that dispatches all 601
+The Node suite includes a scripted campaign that dispatches all 601
 foreground events, including legitimate replays after checkpoint restoration.
 It completes the animated shop visits, buys a Cannon after stage two, uses it
 against an opening stage-three formation, then verifies death and recovery with
@@ -660,20 +562,23 @@ python3 -m http.server 8081 --bind 127.0.0.1 --directory dist
 ```
 
 Open <http://127.0.0.1:8081/> and start a run. `dist/` contains the complete
-static game, including music and effects. You can move the whole folder and
-serve it with any static HTTP server; opening `index.html` directly from disk
-doesn't work. The original archives, extraction tools and tests are not copied.
+static game. The build decodes graphics, maps, and gameplay data ahead of time,
+then packs them with the music and effects into `game-assets.bin`, a single
+gzip-compressed bundle. The browser fetches that bundle, not `XENON2.EXE` or
+the other original files. You can move the whole folder and serve it with any
+static HTTP server; opening `index.html` directly from disk doesn't work.
 
 The script checks for all required files and refuses to replace an existing
 `dist/`. To build again, move the old folder aside first. To use assets from
 another folder with the same layout, run `npm run build:dist -- /path/to/assets`.
-The build is ignored by Git and doesn't upload anything. Keep it private until
-you have written permission to redistribute the DOS files and audio.
+The build is ignored by Git and doesn't upload anything. The extracted assets
+and audio still require permission to redistribute.
 
 After permission is in place, the manual GitHub Pages workflow can build from a
-cleared bundle attached as `pages-assets.zip` to a
-published release. Put the asset files at the ZIP root, without a wrapping
-folder. Set **Settings → Pages → Source** to **GitHub Actions**, then run
+cleared `game-assets.bin` attached to a published release. The original files
+are not needed by the workflow. Locally, you can assemble the same site
+without them using `npm run build:dist -- --bundle /path/to/game-assets.bin`.
+Set **Settings → Pages → Source** to **GitHub Actions**, then run
 **Deploy standalone game** from `main`, supplying that release tag. The workflow
 deploys only `dist/`. It does not run on push. Add a play link only after the
 deployment is live and you can start a game with audio.
