@@ -2,7 +2,10 @@ const EFFECT_CHANNELS = {
   shot: [2], explosion: [1], "explosion-large": [1], pickup: [2],
   credit: [2], health: [2], dive: [2], death: [1, 2],
 };
-const directory = new URL("../amiga/audio/", import.meta.url);
+export const AMIGA_AUDIO_PATHS = Object.freeze(Object.fromEntries([
+  ["music", "amiga/audio/megablast.ogg"],
+  ...Object.keys(EFFECT_CHANNELS).map((name) => [name, `amiga/audio/sfx-${name}.wav`]),
+]));
 
 export class AmigaAudio {
   constructor({
@@ -49,10 +52,9 @@ export class AmigaAudio {
       const resumed = this.context.resume();
       if (!this.loading) {
         this.notify("loading");
-        this.loading = Promise.all(["music", ...Object.keys(EFFECT_CHANNELS)].map(async (name) => {
-          const file = name === "music" ? "megablast.ogg" : `sfx-${name}.wav`;
-          const response = await this.fetch(new URL(file, directory));
-          if (!response.ok) throw new Error(`Could not load Amiga audio: ${file}`);
+        this.loading = Promise.all(Object.entries(AMIGA_AUDIO_PATHS).map(async ([name, path]) => {
+          const response = await this.fetch(new URL(`../${path}`, import.meta.url));
+          if (!response.ok) throw new Error(`Could not load Amiga audio: ${path.split("/").at(-1)}`);
           const buffer = await this.context.decodeAudioData(await response.arrayBuffer());
           return [name, buffer];
         })).then((entries) => {

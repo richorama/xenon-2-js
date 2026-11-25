@@ -29,6 +29,9 @@ jobs:
       - name: Check JavaScript syntax
         run: npm run check
 
+      - name: Test standalone packaging without game assets
+        run: node --test test/build-dist.test.js
+
       - name: Run asset-independent Python tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node tools/server.mjs",
+    "build:dist": "node tools/build-dist.mjs",
     "test": "node --test",
     "check": "node --check src/formats.js && node --check src/motion.js && node --check src/controls.js && node --check src/actor-pool.js && node --check src/ground.js && node --check src/stage-one-worms.js && node --check src/stage-three-ground.js && node --check src/stage-three-miniboss.js && node --check src/stage-three-boss.js && node --check src/stage-four-ground.js && node --check src/stage-four-miniboss.js && node --check src/stage-four-boss.js && node --check src/stage-five-ground.js && node --check src/stage-five-miniboss.js && node --check src/stage-five-boss.js && node --check src/boss.js && node --check src/miniboss.js && node --check src/stage-two-boss.js && node --check src/assets.js && node --check src/game.js && node --check src/shop.js && node --check src/shop-screen.js && node --check src/run-screen.js && node --check src/nashwan.js && node --check src/weapons.js && node --check src/audio.js && node --check src/amiga-audio.js && node --check src/renderer.js && node --check src/main.js && node --check tools/server.mjs"
   }

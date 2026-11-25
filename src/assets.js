@@ -30,20 +30,21 @@ export function decodeStage(exe, number, files, shared, weapons) {
   };
 }
 
+export const DOS_ASSET_PATHS = Object.freeze([
+  "XENON2.EXE", "X2SPR.DAT", "X2WEAPS.DAT", "SHOP.DAT",
+  ...Array.from({ length: 5 }, (_, i) =>
+    ["MODS.VGA", "SPRITES.VGA", "MAP.CMP", "EVENTS.PC", "EVENTSBG.PC", "PATHS.BIN"]
+      .map((name) => `S${i + 1}/${name}`)).flat(),
+  "GR.DAT",
+]);
+
 export async function loadAssets(onProgress = () => {}) {
-  const names = [
-    "XENON2.EXE", "X2SPR.DAT", "X2WEAPS.DAT", "SHOP.DAT",
-    ...Array.from({ length: 5 }, (_, i) =>
-      ["MODS.VGA", "SPRITES.VGA", "MAP.CMP", "EVENTS.PC", "EVENTSBG.PC", "PATHS.BIN"]
-        .map((name) => `S${i + 1}/${name}`)).flat(),
-    "GR.DAT",
-  ];
   let loaded = 0;
-  const files = await Promise.all(names.map(async (name) => {
+  const files = await Promise.all(DOS_ASSET_PATHS.map(async (name) => {
     const response = await fetch(new URL(`../${name}`, import.meta.url));
     if (!response.ok) throw new Error(`Could not load ${name}: HTTP ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
-    onProgress(++loaded, names.length);
+    onProgress(++loaded, DOS_ASSET_PATHS.length);
     return bytes;
   }));
   const [exe, global, weapons, shop] = files;

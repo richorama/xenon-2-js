@@ -9,7 +9,7 @@ stages and flew into round two. It plays through to the ending, but it doesn't
 match the DOS game frame for frame.
 
 **💾 Bring your own DOS game files.** The game decodes them locally as it
-starts. They're not included in this repository, so there's no standalone
+starts. They're not included in this repository or hosted as a standalone
 web build.
 
 ## Run
@@ -648,6 +648,35 @@ patched, and these corrected comparisons must not be described as exact parity
 with the unmodified DOS game.
 Isolated routine parity is not proof of whole-game fidelity. These verification
 tools are not runtime dependencies and write no extracted assets.
+
+## Build a standalone folder
+
+Once [the DOS files](#run) and [browser audio](#recovered-amiga-audio) are in
+place, build and preview from the project root:
+
+```sh
+npm run build:dist
+python3 -m http.server 8081 --bind 127.0.0.1 --directory dist
+```
+
+Open <http://127.0.0.1:8081/> and start a run. `dist/` contains the complete
+static game, including music and effects. You can move the whole folder and
+serve it with any static HTTP server; opening `index.html` directly from disk
+doesn't work. The original archives, extraction tools and tests are not copied.
+
+The script checks for all required files and refuses to replace an existing
+`dist/`. To build again, move the old folder aside first. To use assets from
+another folder with the same layout, run `npm run build:dist -- /path/to/assets`.
+The build is ignored by Git and doesn't upload anything. Keep it private until
+you have written permission to redistribute the DOS files and audio.
+
+After permission is in place, the manual GitHub Pages workflow can build from a
+cleared bundle attached as `pages-assets.zip` to a
+published release. Put the asset files at the ZIP root, without a wrapping
+folder. Set **Settings → Pages → Source** to **GitHub Actions**, then run
+**Deploy standalone game** from `main`, supplying that release tag. The workflow
+deploys only `dist/`. It does not run on push. Add a play link only after the
+deployment is live and you can start a game with audio.
 
 ## License
 
