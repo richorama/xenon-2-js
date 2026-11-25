@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#000000">
+  <meta name="description" content="Xenon 2 native browser reconstruction using locally supplied game data.">
+  <title>Xenon 2</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="src/main.js"></script>
+</head>
+<body>
+  <main id="player" aria-label="Xenon 2">
+    <div class="screen" id="screen">
+      <canvas id="game" width="320" height="200" tabindex="0" aria-label="Xenon 2. Move with arrows or WASD, fire with Space, dive or surface with Shift, pause with P, fullscreen with F.">Your browser needs Canvas 2D support to play.</canvas>
+      <div class="overlay" id="overlay">
+        <div>
+          <h1 id="overlay-title">XENON 2</h1>
+          <p id="load-error" role="alert" hidden></p>
+          <p id="continue-count" role="status" hidden></p>
+          <button id="launch" type="button" disabled>LOADING <span id="load-count">0 / 35</span></button>
+        </div>
+      </div>
+      <section id="shop-panel" class="shop-panel" aria-label="Colin's equipment shop" hidden>
+        <div id="shop-hotspots"></div>
+        <p id="shop-message" class="visually-hidden" role="status"></p>
+      </section>
+      <section id="menu-panel" class="menu-panel" aria-label="Game menu" hidden>
+        <button type="button" class="menu-choice" aria-label="1 player game"></button>
+        <button type="button" class="menu-choice" aria-label="2 player game"></button>
+        <button type="button" class="menu-choice" aria-label="Music"></button>
+      </section>
+      <div class="score-panel" id="score-controls" role="group" aria-label="Enter high-score initials" hidden>
+        <button id="score-previous" type="button" aria-label="Previous letter"></button>
+        <button id="score-confirm" type="button" aria-label="Confirm letter"></button>
+        <button id="score-next" type="button" aria-label="Next letter"></button>
+      </div>
+    </div>
+    <nav class="toolbar" aria-label="Game controls">
+      <button id="sound" type="button" aria-pressed="true" title="Toggle recovered Amiga music and effects (M)">SOUND ON</button>
+      <button id="pause" type="button" disabled title="Pause or resume (P)">PAUSE</button>
+      <button id="restart" type="button" disabled title="Restart run (R)">RESTART</button>
+      <button id="fullscreen" type="button" aria-pressed="false" title="Enter fullscreen (F)" hidden>FULLSCREEN</button>
+      <button id="high-scores" type="button" hidden>HIGH SCORES</button>
+      <button id="player-mode" type="button" hidden>TWO PLAYERS</button>
+    </nav>
+    <p id="score-status" class="visually-hidden" role="status"></p>
+    <div class="touch-controls" aria-label="Touch controls">
+      <span>Drag the ship to move + fire</span>
+      <button id="touch-dive" type="button">DIVE</button>
+      <button id="touch-fire" type="button">HOLD TO FIRE</button>
+      <button id="touch-exit-fullscreen" type="button" hidden>EXIT FULLSCREEN</button>
+    </div>
+    <div class="controls" aria-label="Keyboard controls">
+      <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> Move</span>
+      <span><kbd>SPACE</kbd> Fire</span>
+      <span><kbd>SHIFT</kbd> Dive / surface</span>
+      <span><kbd>P</kbd> Pause</span>
+      <span><kbd>R</kbd> Restart</span>
+      <span><kbd>M</kbd> Sound</span>
+      <span id="fullscreen-help" hidden><kbd>F</kbd> Fullscreen / <kbd>ESC</kbd> Exit</span>
+      <span><kbd>ENTER</kbd> Menu / select / resume / continue</span>
+      <span>Shop: arrows + <kbd>ENTER</kbd> or tap; select an item, then BUY / SELL; EXIT finishes selling, then leaves</span>
+    </div>
+    <noscript><p>JavaScript is required to play.</p></noscript>
+  </main>
+</body>
+</html>

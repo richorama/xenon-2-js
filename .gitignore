@@ -1,0 +1,39 @@
+# Dependencies and local Python environments
+node_modules/
+.venv/
+venv/
+
+# Caches and local test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+coverage/
+.playwright-mcp/
+*.log
+
+# Local environment settings
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# OS metadata and Windows download markers
+.DS_Store
+Thumbs.db
+*:Zone.Identifier
+*:Zone.Identifier:$DATA
+*.Zone.Identifier
+
+# Supply original DOS and Amiga data locally; do not commit extracted assets.
+/XENON2.EXE
+/X2SPR.DAT
+/X2WEAPS.DAT
+/GR.DAT
+/SHOP.DAT
+/MAP.CMP
+/EVENTS.PC
+/EVENTSBG.PC
+/S[1-5]/
+/*.ba1
+/file_id.diz
+/amiga/
