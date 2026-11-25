@@ -1,75 +1,81 @@
-# Xenon 2: native browser reconstruction
+# 🚀 Xenon 2: Megablast in your browser
 
-A playable **native five-stage reconstruction of Xenon 2: Megablast**, including
-the bosses, shops, victory sequence and harder second round. A continuous
-[input-only Chromium replay](#validate) cleared all five stages and flew into
-round two. Frame-by-frame parity with the DOS game is not complete.
-The browser runs JavaScript and Canvas 2D; it does not run DOS, WebAssembly,
-or an emulated CPU. Original game files are decoded locally at startup.
+Blast through five stages, spend your credits at Colin's shop, and see how far
+you get in the harder second round. Play solo or take turns with a friend.
+
+This is a native JavaScript and Canvas 2D reconstruction, not a DOS emulator.
+A [Chromium replay using only gameplay inputs](#validate) cleared all five
+stages and flew into round two. It plays through to the ending, but it doesn't
+match the DOS game frame for frame.
+
+**💾 Bring your own DOS game files.** The game decodes them locally as it
+starts. They're not included in this repository, so there's no standalone
+web build.
 
 ## Run
 
-Requires Node.js 20+ and your own copy of the original DOS game files. Put
-`XENON2.EXE`, `X2SPR.DAT`, `X2WEAPS.DAT`, `GR.DAT`, `SHOP.DAT` and the
-`S1` through `S5` directories in the project root. Each stage directory needs
-`MODS.VGA`, `SPRITES.VGA`, `MAP.CMP`, `EVENTS.PC`, `EVENTSBG.PC` and `PATHS.BIN`.
-These files are not included and Git ignores them. The game plays without
-audio; see [Recovered Amiga audio](#recovered-amiga-audio) to add it locally.
-There are no npm dependencies, build steps, external fonts, CDNs, or network APIs.
+You'll need **Node.js 20+** and your own copy of the original DOS game.
+Clone the repository, then copy the files into these locations:
+
+| Where | Files |
+| --- | --- |
+| Project root | `XENON2.EXE`, `X2SPR.DAT`, `X2WEAPS.DAT`, `GR.DAT`, `SHOP.DAT` |
+| Each stage folder (`S1` through `S5`) | `MODS.VGA`, `SPRITES.VGA`, `MAP.CMP`, `EVENTS.PC`, `EVENTSBG.PC`, `PATHS.BIN` |
+
+From the project root:
 
 ```sh
 npm start
 ```
 
-Open <http://127.0.0.1:8080>. The server binds to loopback only. To change the port:
+Open <http://127.0.0.1:8080>. There's nothing to install or build. The server
+only listens on your machine; use `PORT=8081 npm start` for a different port.
 
-```sh
-PORT=8081 npm start
-```
+🎵 Sound is optional. See [Recovered Amiga audio](#recovered-amiga-audio) to
+add the soundtrack and effects.
 
-Press **Enter** or **Space**, or tap the attract screen, to open the original
-selection menu. Use **Up / Down** and **Enter / Space**, or tap an option.
-Press the same button on **Get Ready** to start flying.
+## 🎮 Controls
 
-Move with **WASD / arrows**, fire with **Space**, dive with **Shift**, pause with
-**P / Escape**, restart with **R**, and toggle recovered Amiga audio with **M**.
-Press **Shift** again to surface early. On touchscreens, drag the ship to move
-and fire; tap **Dive** to submerge or **Surface** to end a dive early.
-The game pauses when its window loses focus.
-Use **F** or the **Fullscreen** button to fill the screen; **Esc** exits.
-Fullscreen preserves the game's aspect ratio. On a touchscreen, **Dive / Surface**
-and **Hold to Fire** remain available during play, and **Exit Fullscreen** returns
-to the page. These controls are hidden during initials entry. Keyboard fullscreen
-hides the touch controls; press **F** or **Esc** to leave it.
-Hold **Down at the bottom edge** to reverse the map within the original
-16-pixel backtracking allowance; forward scrolling resumes at that limit.
-If the Amiga audio files are installed, they load when a run starts.
-**M** or the sound button mutes both music and effects.
-Clicking the sound button during flight returns focus to the game so **Space**
-still fires. Keyboard users can still tab to the button and activate it normally.
-Pause freezes the music position and stops effects; resume continues the music.
-Restart resets the music without changing your mute preference.
+Press **Enter** or **Space**, or tap the title screen, to open the menu.
+Use **Up / Down** to select a mode, then **Enter / Space** to confirm, or
+tap the option directly. On **Get Ready**, press **Enter / Space** or tap
+**Start Turn** to launch.
+
+| Action | Keyboard | Touch |
+| --- | --- | --- |
+| Move and fire | WASD or arrows to move; Space to fire | Drag the ship to move and fire; **Hold to Fire** to fire in place |
+| Dive / surface early | Shift | **Dive / Surface** |
+| Pause | P or Esc (Esc exits fullscreen first) | **Pause** outside fullscreen |
+| Fullscreen | F to toggle; Esc to exit | **Fullscreen / Exit Fullscreen** |
+| Restart / sound | R / M | **Restart / Sound** outside fullscreen |
+
+Tip: hold **Down at the bottom edge** to backtrack up to 16 pixels. The game
+pauses if its window loses focus. If audio is installed, pausing stops effects
+and lets the music resume where it left off; restarting keeps your mute setting.
+
+### Lives, scores and two players
+
 When you lose a life, you return to the last checkpoint with the equipment and
-credits it saved. Press **Space**, **Enter**, or tap **Start Turn** at Get Ready
-to resume. After the last life, a qualifying score asks for three initials.
-Use **Left / Right** to choose a character and **Space / Enter** to confirm it.
-On touchscreens, tap the left or right third of the score screen to change the
-letter, or the middle third to confirm. Then press **Space**, **Enter**, or tap
-**Continue** before the countdown expires. A continue restores three lives and resets your
-score, then shows Get Ready. A run starts with two continues; each victory earns
-another. Game Over returns to the title screen, where **High Scores** is available.
-Scores survive restarts but reset when you reload the page.
+credits it saved. After the last life, press **Enter / Space** or tap
+**Continue** before the countdown ends: you get three lives but lose your
+score. You start with two continues and earn one more each time you clear the
+campaign.
 
-Choose **2 Player Game** for local alternating play on the same controls. Press
-**Space**, **Enter**, or tap the **Get Ready** screen to start each turn. Each
-player has their own lives, continues, equipment and checkpoints. Losing a life
-passes control to the other player unless they already finished the stage or
-were eliminated. The next stage starts once both surviving players finish.
-Each seat earns one continue for clearing the campaign. If a partner is
-eliminated while the winner is waiting, the ending plays without awarding the
-winner a second continue.
+If you qualify for the high-score board, use **Left / Right** to change a letter
+and **Enter / Space** to confirm. On touch, tap the left or right third to
+change the letter, or the middle to confirm. The toolbars stay hidden during
+initials entry. **High Scores** is available from the title screen; scores last
+until you reload the page.
 
-Stage one opens Colin's shop at its original mid-level world-position trigger
+Choose **2 Player Game** to take turns on the same controls. Each player keeps
+their own lives, continues, equipment and checkpoints. Losing a life passes
+control to the other player unless they've already finished the stage or are
+out of the game. The next stage starts once both surviving players finish.
+
+<details>
+<summary>Campaign walkthrough (boss spoilers)</summary>
+
+**Stage one** opens Colin's shop at its original mid-level world-position trigger
 (roughly two minutes in, depending on movement). Continue resumes the same stage
 and equipment. Stage one continues to its original boss: damage its glowing
 eye, avoid the articulated tentacle, and collect the credit burst after defeating
@@ -77,7 +83,8 @@ it. The next-stage shop waits until those counted credits are collected or expir
 Before the first shop, rotating terrain openings release segmented worms.
 Each part can be destroyed individually; heads are worth 250 points and
 segments 50.
-Stage two also runs its original animated hatches: large/small creatures emerge
+
+**Stage two** runs its original animated hatches: large/small creatures emerge
 twice, climb into position and dive at the ship; other pods open into eight-way
 swarms that periodically re-aim and expire. The hatch machinery is map scenery,
 not a damageable enemy, so Z clears released creatures without disabling it.
@@ -91,7 +98,8 @@ upward to activate it, use backscroll to keep its mouth in view, and shoot that
 weak point while avoiding downward shots and sixteen-way volleys. Its eggs hatch
 into armed crawlers that repair broken arena walls. Defeating it releases twenty
 counted credit globes before the stage-three shop.
-Stage three includes retracting eight-part wall arms, attacking skaters,
+
+**Stage three** includes retracting eight-part wall arms, attacking skaters,
 wall-following crawlers and two-stage terrain turrets. Destroy a turret's lower
 gun to expose its separately damageable, eight-way-firing core. Its 17-part
 miniboss locks the camera at 2800: shoot its two eyes while they open, avoid its
@@ -101,22 +109,29 @@ indestructible. Its final encounter is an eleven-part worm with an 80-health
 head, delayed body segments, repeated paths and eight-way fire. Its body absorbs
 shots; defeating its head releases twenty counted credits before the stage-four
 shop.
-Stage four includes extending wall rams and hunters that emerge from wall
+**Stage four** includes extending wall rams and hunters that emerge from wall
 hatches. Its twenty-part miniboss locks the camera: destroy the trailing end
 of the sweeping arm and four fixed guns, then backtrack to the exposed core.
 Ten counted credits gate the same-stage shop. The final boss has a sweeping
 beam and two turrets; destroy both turrets before attacking the core. Twenty
 counted credits gate the stage-five shop.
-Stage five adds wall patrols that launch homing enemies and three ten-ship
+
+**Stage five** adds wall patrols that launch homing enemies and three ten-ship
 formations that fire rings. Its moving miniboss exposes a small core; its four
 guns can be destroyed separately. The miniboss's ten credits lead back to
 Colin's shop. At the final arena, destroy all eighteen defenses, then hold
 **Down at the bottom edge** to backtrack if the exposed core has scrolled out of
 view. Collect or wait out its twenty credits to see the victory sequence.
+
 Afterward, the game loops to stage one with tougher ordinary enemies and a fresh
 starter gun in place of the previous loadout. Health, lives and score carry
 forward. Between stages of the same round, equipment also carries forward.
 Entering a new stage or round resets credits.
+
+</details>
+
+### Shop and power-ups
+
 The original stage-specific minimum shop balances are applied to low funds.
 The shop fills the game canvas with the original cabinet, twenty animated
 equipment displays, Colin, shutters, pixel dialogue, credits and action buttons.
@@ -206,6 +221,9 @@ within a frame or provide hardware-exact four-channel arbitration.
 
 ## What is actually recovered
 
+<details>
+<summary>Technical reference: DOS routines, file formats and ported systems</summary>
+
 Executable addresses below are `CS` offsets in this specific DOS executable,
 after removing its `0x800`-byte MZ header. Original files are never modified.
 
@@ -280,12 +298,14 @@ after removing its `0x800`-byte MZ header. Original files are never modified.
 | Amiga audio | The BS1 executable's custom David Whittaker replay module supplies Megablast and source-mapped effects. Original 68000 routines are executed offline to generate browser-playable audio; no emulated CPU runs in the browser. See the audio section for mixing limitations. |
 | PC-speaker reference | Segment `14b9`, offsets `0145-040c`: native two-channel sequencer, arpeggios, vibrato, slides and effect modulation. Both tunes and all 26 effect descriptors are checked against 221,184 original driver ticks. Retained in `src/audio.js` and tests for research; no longer used for game playback. |
 
-`src/game.js` combines those recovered systems with a provisional playable shell:
+`src/game.js` combines those recovered systems with the main game loop:
 shooting, shields, lives, collision, diving and scoring.
 `src/renderer.js` draws the decoded graphics without extracted image files.
 `src/shop.js` manages inventory and transactions; `src/shop-screen.js` supplies
 the graphical shop. `src/nashwan.js` implements the temporary Super Nashwan
 loadout; `src/weapons.js` implements the recovered weapon behavior.
+
+</details>
 
 ## Intentional fixes to original DOS bugs
 
@@ -316,6 +336,12 @@ phase values. The native port matches those observed routines rather than
 silently correcting their apparent intent.
 
 ## Fidelity limits
+
+The campaign is playable from start to finish, but some details still differ
+from DOS. See [the remaining work](PLAN.md) for the development checklist.
+
+<details>
+<summary>Detailed fidelity notes</summary>
 
 - Menu launch and stage changes show the recovered numbered loading frame
   followed by Get Ready.
@@ -490,6 +516,8 @@ silently correcting their apparent intent.
 - Audio uses the recovered Amiga soundtrack and eight original effects, but
   does not reproduce Paula music-channel stealing or analogue filters. Specialized
   weapon effects, original shop audio flow and other unported events remain incomplete.
+
+</details>
 
 ## Validate
 
