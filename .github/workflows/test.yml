@@ -1,0 +1,38 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "24"
+
+      - name: Set up Python
+        uses: actions/setup-python@v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Check JavaScript syntax
+        run: npm run check
+
+      - name: Test standalone packaging without game assets
+        run: node --test test/build-dist.test.js
+
+      - name: Run asset-independent Python tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: python3 -m unittest discover -s test -p 'amiga_test.py' -v

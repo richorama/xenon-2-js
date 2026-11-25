@@ -1,0 +1,53 @@
+name: Deploy standalone game
+
+on:
+  workflow_dispatch:
+    inputs:
+      asset_release_tag:
+        description: Release tag with the redistribution-cleared game-assets.bin
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: "24"
+      - name: Build from approved release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET_RELEASE_TAG: ${{ inputs.asset_release_tag }}
+        run: |
+          test -n "$ASSET_RELEASE_TAG"
+          test "$(gh release view --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft -- "$ASSET_RELEASE_TAG")" = false
+          gh release download --repo "$GITHUB_REPOSITORY" --pattern game-assets.bin --dir "$RUNNER_TEMP" -- "$ASSET_RELEASE_TAG"
+          npm run build:dist -- --bundle "$RUNNER_TEMP/game-assets.bin"
+      - uses: actions/upload-pages-artifact@v5.0.0
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/deploy-pages@v5.0.1
+        id: deployment
