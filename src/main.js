@@ -25,6 +25,7 @@ let firePointer;
 let diveRequested = false;
 let scoreStep = 0;
 let scoreConfirm = false;
+let cheatsEnabled = false;
 let bundledAudio;
 const audio = new AmigaAudio({
   onState: updateSoundButton,
@@ -219,6 +220,22 @@ const gameKeys = new Set([
 ]);
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.altKey || event.metaKey) return;
+  if (event.code === "F7" && ["ready", "menu"].includes(game?.status)) {
+    event.preventDefault();
+    if (!event.repeat) {
+      cheatsEnabled = true;
+      updateInterface();
+    }
+    return;
+  }
+  if (event.code === "KeyI" && cheatsEnabled && game?.status === "playing") {
+    event.preventDefault();
+    if (!event.repeat) {
+      game.run.cheatInvulnerable = !game.run.cheatInvulnerable;
+      updateInterface();
+    }
+    return;
+  }
   if (game?.status === "menu") {
     const step = { ArrowUp: -1, KeyW: -1, ArrowDown: 1, KeyS: 1 }[event.code];
     if (step) {
@@ -387,6 +404,10 @@ function updateInterface() {
     const music = String(audio.enabled);
     if (menuChoices[2].getAttribute("aria-pressed") !== music) menuChoices[2].setAttribute("aria-pressed", music);
   }
+  const cheatStatus = $("cheat-status");
+  cheatStatus.hidden = !cheatsEnabled;
+  const cheatText = game.run.cheatInvulnerable ? "CHEAT: INVULNERABLE" : "CHEATS ARMED - I: OFF";
+  if (cheatStatus.textContent !== cheatText) cheatStatus.textContent = cheatText;
   const count = $("continue-count");
   if (status === "continue") {
     const text = `${game.continueTicks >> 3}. ${game.continues} ${game.continues === 1 ? "continue" : "continues"} left.`;
