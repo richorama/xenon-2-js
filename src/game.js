@@ -937,7 +937,8 @@ export class Game {
   }
 
   damage(amount = 8) {
-    if (this.invincible || this.divePhase || this.countedCredits || this.status !== "playing") return;
+    if (this.run.cheatInvulnerable || this.invincible || this.divePhase
+      || this.countedCredits || this.status !== "playing") return;
     if (this.player.protection) amount >>>= 1;
     const health = this.player.health;
     this.player.health = Math.max(0, health - amount);

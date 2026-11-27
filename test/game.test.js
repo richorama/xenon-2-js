@@ -152,22 +152,25 @@ test("terrain contact rewinds one world position even when the obstacle disappea
   assert.deepEqual([game.player.x, game.terrainRecovery], [156, 0]);
 });
 
-test("unrecoverable terrain contact costs a life even with invulnerability", () => {
-  const game = emptyGame();
-  game.camera = game.control.ceiling = 4000;
-  game.player.x = 162;
-  game.resetDive();
-  game.map.fill(0);
-  for (let row = 259; row <= 261; row++) game.map[row * 20 + 11] = 64;
-  game.grantInvulnerability();
-  game.update({ right: true });
-  for (let i = 0; i < 17; i++) game.update();
-  assert.equal(game.status, "playing");
-  assert.equal(game.terrainRecovery, -17);
-  assert.equal(game.player.y, 176);
-  game.update();
-  assert.equal(game.status, "dying");
-  assert.equal(game.player.health, 0);
+test("unrecoverable terrain contact costs a life even with pickup or cheat invulnerability", () => {
+  for (const cheat of [false, true]) {
+    const game = emptyGame();
+    game.camera = game.control.ceiling = 4000;
+    game.player.x = 162;
+    game.resetDive();
+    game.map.fill(0);
+    for (let row = 259; row <= 261; row++) game.map[row * 20 + 11] = 64;
+    if (cheat) game.run.cheatInvulnerable = true;
+    else game.grantInvulnerability();
+    game.update({ right: true });
+    for (let i = 0; i < 17; i++) game.update();
+    assert.equal(game.status, "playing");
+    assert.equal(game.terrainRecovery, -17);
+    assert.equal(game.player.y, 176);
+    game.update();
+    assert.equal(game.status, "dying");
+    assert.equal(game.player.health, 0);
+  }
 });
 
 test("the stage-one wall pushes the ship back without costing health", () => {
@@ -380,6 +383,35 @@ test("repeated hits still cost energy; invulnerability and counted rewards preve
   game.countedCredits = 1;
   game.damage(39);
   assert.equal(game.player.health, 23);
+});
+
+test("the invulnerability cheat blocks energy damage until disabled", () => {
+  const game = emptyGame();
+  const losses = [];
+  game.onHealthLost = (amount) => losses.push(amount);
+  game.run.cheatInvulnerable = true;
+  game.damage(39);
+  assert.equal(game.player.health, 39);
+  assert.equal(game.status, "playing");
+  assert.deepEqual(losses, []);
+  assert.ok(!game.sounds.includes("hit"));
+  game.run.cheatInvulnerable = false;
+  game.damage();
+  assert.equal(game.player.health, 31);
+  assert.deepEqual(losses, [8]);
+});
+
+test("the invulnerability cheat is shared between players and cleared by a new run", () => {
+  const game = new Game(loadTestCampaign());
+  game.start(1, 2);
+  game.continueRun();
+  game.run.cheatInvulnerable = true;
+  game.damage();
+  game.partner.damage();
+  assert.deepEqual([game.player.health, game.partner.player.health], [39, 39]);
+  game.start();
+  game.damage();
+  assert.equal(game.player.health, 31);
 });
 
 test("last lives offer at most two timed continues, each restoring three lives and clearing score", () => {

@@ -99,6 +99,19 @@ canvas {
 }
 main[data-status="ready"] .run-overlay #launch { inset: 0; width: 100%; height: 100%; }
 #load-error { max-width: 420px; font-size: 13px; line-height: 1.6; color: #ff947d; }
+#cheat-status {
+  position: absolute;
+  top: 4%;
+  right: 2%;
+  z-index: 1;
+  max-width: 96%;
+  margin: 0;
+  padding: 4px 6px;
+  color: var(--accent);
+  background: #000d;
+  font-size: clamp(8px, 1.2vw, 12px);
+  pointer-events: none;
+}
 .toolbar { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .toolbar button { font-size: 11px; }
 main[data-status="score-entry"] :is(.toolbar, .controls, .touch-controls) { display: none; }

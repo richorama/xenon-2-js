@@ -32,6 +32,17 @@ only listens on your machine; use `PORT=8081 npm start` for a different port.
 add the soundtrack and effects. To package the game for a static server,
 see [Build a standalone folder](#build-a-standalone-folder).
 
+### Original DOS cheat
+
+For practice, press **F7** at the title screen or game menu, start playing, then
+press **I** to toggle invulnerability. A visible indicator shows whether the
+cheat is armed or active, including in fullscreen. Restarting a run turns
+invulnerability off; reload the page to disarm cheats entirely.
+
+This recreates the original DOS energy-damage bypass, not the timed pickup:
+getting irrecoverably trapped in terrain can still cost a life. Cheats are off
+by default, and the browser shortcuts are not available to headless/AI controls.
+
 ## Headless gameplay and frame capture
 
 The headless runner uses the same game simulation and renderer in Node.js, without
