@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Xenon 2 action replay</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="module" src="../src/replay-screen.js"></script>
+</head>
+<body>
+  <main aria-label="Xenon 2 action replay">
+    <div class="screen">
+      <canvas id="game" width="320" height="200" aria-label="Recorded gameplay">Your browser needs Canvas 2D support.</canvas>
+    </div>
+    <label>Open an actions.jsonl recording
+      <input id="recording" type="file" accept=".jsonl,application/x-ndjson" disabled>
+    </label>
+    <nav class="toolbar" aria-label="Replay controls">
+      <button id="play" type="button" disabled>PLAY</button>
+      <button id="restart" type="button" disabled>RESTART</button>
+    </nav>
+    <p id="replay-status" role="status">Loading game assets...</p>
+    <p id="replay-error" role="alert" hidden></p>
+    <p class="controls">Real-time playback of recorded controls. No model calls, screenshots or audio required.</p>
+    <a href="../">Return to the game</a>
+  </main>
+</body>
+</html>

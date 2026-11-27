@@ -26,11 +26,14 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install development dependencies
+        run: npm ci
+
       - name: Check JavaScript syntax
         run: npm run check
 
-      - name: Test standalone packaging without game assets
-        run: node --test test/build-dist.test.js
+      - name: Test packaging and AI controls without game assets
+        run: node --test test/build-dist.test.js test/headless.test.js test/replay.test.js test/foundry-local.test.js test/foundry-decision.test.js
 
       - name: Run asset-independent Python tests
         env:

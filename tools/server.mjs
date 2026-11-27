@@ -15,6 +15,7 @@ const types = {
   ".json": "application/json; charset=utf-8",
 };
 const allowed = (relative) => relative === "index.html" || relative === "styles.css"
+  || relative === "tools/replay.html"
   || relative === "XENON2.EXE" || ["X2SPR.DAT", "X2WEAPS.DAT", "SHOP.DAT", "GR.DAT"].includes(relative)
   || /^src\/[a-z-]+\.js$/.test(relative)
   || /^amiga\/audio\/(megablast\.(ogg|wav|dw)|(music|effect)-[0-9]{2}\.wav|manifest\.json)$/.test(relative)

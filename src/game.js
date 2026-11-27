@@ -939,7 +939,9 @@ export class Game {
   damage(amount = 8) {
     if (this.invincible || this.divePhase || this.countedCredits || this.status !== "playing") return;
     if (this.player.protection) amount >>>= 1;
-    this.player.health = Math.max(0, this.player.health - amount);
+    const health = this.player.health;
+    this.player.health = Math.max(0, health - amount);
+    if (health > this.player.health) this.onHealthLost?.(health - this.player.health);
     this.sounds.push("hit");
     if (this.player.health === 0) this.killPlayer();
   }
@@ -1153,9 +1155,10 @@ export class Game {
     return slot;
   }
 
-  resolvePickup(pickup, advancesCountdown) {
+  resolvePickup(pickup, advancesCountdown, collected = false) {
     if (advancesCountdown && this.countedCredits) this.countedCredits--;
     pickup.dead = true;
+    this.onPickupResolved?.(pickup, collected);
   }
 
   updatePickup(pickup, hull) {
@@ -1175,7 +1178,7 @@ export class Game {
       ? shipContactBox && intersects(shipContactBox, this.bounds(this.sprite(this.pickupFrame(pickup)), pickup.x, pickup.y))
       : intersects(hull, { x: pickup.x - 7, y: pickup.y - 7, w: 14, h: 14 }));
     if (this.status !== "playing" || !contact) return;
-    this.resolvePickup(pickup, pickup.state !== undefined && pickup.kind === "credit");
+    this.resolvePickup(pickup, pickup.state !== undefined && pickup.kind === "credit", true);
     if (pickup.state === undefined) this.score += 50;
     if (pickup.kind === "reward") grantReward(this, pickup.reward);
     else if (pickup.kind === "power") {
@@ -1500,8 +1503,8 @@ export class Game {
   }
 
   // CS:1e29 tests the alignment-specific hull against the OR of the tile's four planes.
-  shipTouchesTerrain() {
-    const left = this.player.x - 14, top = this.player.y + this.camera - 14;
+  shipTouchesTerrain(player = this.player) {
+    const left = player.x - 14, top = player.y + this.camera - 14;
     const column = left >> 4;
     const mask = this.assets.logic.terrainHull[left & 15];
     for (let line = 0; line < 25; line++) {

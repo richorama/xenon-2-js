@@ -9,10 +9,15 @@ const stageOneFlash = (game, actor) => actor.flashTick === game.tick || actor.dr
 const actorPaint = (game) => game.actorPaint?.tick === game.tick && game.actorPaint.map === game.map
   ? game.actorPaint : undefined;
 
-function bitmap(width, height, pixels, palette, alpha) {
+function browserCanvas(width, height) {
   const canvas = document.createElement("canvas");
   canvas.width = width;
   canvas.height = height;
+  return canvas;
+}
+
+function bitmap(createCanvas, width, height, pixels, palette, alpha) {
+  const canvas = createCanvas(width, height);
   const context = canvas.getContext("2d");
   const image = context.createImageData(width, height);
   for (let i = 0; i < pixels.length; i++) {
@@ -24,8 +29,9 @@ function bitmap(width, height, pixels, palette, alpha) {
 }
 
 export class Renderer {
-  constructor(canvas, assets) {
+  constructor(canvas, assets, createCanvas = browserCanvas) {
     this.canvas = canvas;
+    this.createCanvas = createCanvas;
     this.context = canvas.getContext("2d", { alpha: false });
     this.context.imageSmoothingEnabled = false;
     this.setStage(assets);
@@ -53,21 +59,19 @@ export class Renderer {
     for (const bank of [...assets.banks, assets.weapons,
       Object.values(assets.playerShots || {}).flat()]) {
       for (const sprite of bank) {
-        this.images.set(sprite, bitmap(sprite.width, sprite.height,
+        this.images.set(sprite, bitmap(this.createCanvas, sprite.width, sprite.height,
           sprite.pixels, assets.palette, sprite.alpha));
       }
     }
-    const tiles = assets.tiles.map((pixels) => bitmap(16, 16, pixels, assets.palette));
+    const tiles = assets.tiles.map((pixels) => bitmap(this.createCanvas, 16, 16, pixels, assets.palette));
     this.tileImages = tiles;
-    this.maskedTiles = assets.tiles.map((pixels) => bitmap(16, 16, pixels, assets.palette,
+    this.maskedTiles = assets.tiles.map((pixels) => bitmap(this.createCanvas, 16, 16, pixels, assets.palette,
       Uint8Array.from(pixels, (pixel) => pixel ? 255 : 0)));
-    this.whiteTiles = assets.tiles.map((pixels) => bitmap(16, 16, pixels,
+    this.whiteTiles = assets.tiles.map((pixels) => bitmap(this.createCanvas, 16, 16, pixels,
       assets.palette.map(() => [255, 255, 255]),
       Uint8Array.from(pixels, (pixel) => pixel ? 255 : 0)));
     this.mapRevision = -1;
-    this.world = document.createElement("canvas");
-    this.world.width = 320;
-    this.world.height = 4800;
+    this.world = this.createCanvas(320, 4800);
     const context = this.world.getContext("2d");
     for (let i = 0; i < assets.map.length; i++) {
       const tile = tiles[assets.map[i] >>> 6];
@@ -81,7 +85,7 @@ export class Renderer {
     const images = vgaFlash ? this.vgaFlashSprites : mask ? this.whiteSprites : this.images;
     if (mask && !images.has(sprite)) {
       const color = vgaFlash ? this.assets.palette[7] : [255, 255, 255];
-      images.set(sprite, bitmap(sprite.width, sprite.height, sprite.pixels,
+      images.set(sprite, bitmap(this.createCanvas, sprite.width, sprite.height, sprite.pixels,
         this.assets.palette.map(() => color), sprite.alpha));
     }
     this.context.globalAlpha = alpha;
@@ -382,7 +386,8 @@ export class Renderer {
         const index = tile >>> 6;
         if (vgaFlash && !this.vgaFlashTiles.has(index)) {
           const pixels = this.assets.tiles[index];
-          this.vgaFlashTiles.set(index, bitmap(16, 16, pixels, this.assets.palette.map(() => this.assets.palette[7]),
+          this.vgaFlashTiles.set(index, bitmap(this.createCanvas, 16, 16, pixels,
+            this.assets.palette.map(() => this.assets.palette[7]),
             Uint8Array.from(pixels, (pixel) => pixel ? 255 : 0)));
         }
         const image = vgaFlash ? this.vgaFlashTiles.get(index)

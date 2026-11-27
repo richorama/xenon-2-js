@@ -32,6 +32,664 @@ only listens on your machine; use `PORT=8081 npm start` for a different port.
 add the soundtrack and effects. To package the game for a static server,
 see [Build a standalone folder](#build-a-standalone-folder).
 
+## Headless gameplay and frame capture
+
+The headless runner uses the same game simulation and renderer in Node.js, without
+a browser, display, audio, or running web server. It supports external controllers
+and an initial Foundry Local AI player. It still needs the DOS files listed above.
+Install the development dependencies for PNG capture:
+
+```sh
+npm ci
+npm run headless -- --ticks 1100 --decision-ticks 4 --seed 0x5845 --output captures/demo
+```
+
+This holds fire for up to 1100 gameplay ticks (about 60 seconds), running as fast
+as simulation and PNG encoding allow. This baseline stops at shops, Get Ready after losing
+a life, continue/high-score screens, or the end of a run; it does not automatically
+make menu choices.
+The output directory must not already exist. `captures/` is gitignored.
+Omit `--output` for simulation and JSON observations only, which do not need
+the Canvas dependency. Use `--output captures/my-run --no-frames` to save a
+replayable action recording without encoding PNGs or needing Canvas.
+
+Each PNG capture contains:
+
+- `frame-000000.png`, etc.: native 320x200 PNGs, including the initial scene
+  and every subsequent gameplay tick, even within a multi-tick action.
+- `manifest.json`: seed, starting stage, tick rate, dimensions, frame count
+  and final simulation status.
+- `frames.jsonl`: each frame's filename, tick, simulation time and status.
+- `actions.jsonl`: initial observation, requested inputs and tick counts,
+  actual ticks advanced, and resulting observations for replay/debugging.
+
+Assemble a silent video at the original gameplay speed with FFmpeg:
+
+```sh
+ffmpeg -nostdin -n -framerate 1193182/65535 \
+  -i captures/demo/frame-%06d.png \
+  -vf "scale=960:600:flags=neighbor,fps=60" \
+  -c:v libx264 -pix_fmt yuv420p captures/demo.mp4
+```
+
+The input rate is the game's exact approximately 18.2 Hz simulation rate, not
+the capture's wall-clock speed. The 60 fps output repeats frames rather than
+speeding up the game. The initial scene adds one frame to the recording.
+Graphics use the existing Canvas renderer through `@napi-rs/canvas`; HUD font
+rasterization may differ from a browser. Original game assets remain local.
+
+### External controller interface
+
+For an LLM or other controller, run:
+
+```sh
+node tools/headless.mjs --interactive --decision-ticks 4 --output captures/controlled
+```
+
+Use `node` directly for this protocol: npm adds its own non-JSON startup output.
+The process writes one initial `{"type":"ready",...}` response, then reads one
+JSON command per stdin line and writes one JSON response per command:
+
+```json
+{"input":{"right":true,"fire":true}}
+{"command":"observe"}
+{"input":{"left":true,"dive":true},"ticks":2}
+{"command":"close"}
+```
+
+Flight inputs accept only `left`, `right`, `up`, `down`, `fire` and `dive` booleans.
+The decision interval defaults to **4 ticks** (about 0.22 seconds of gameplay).
+Set `--decision-ticks N` to change it, or supply `ticks` on an individual command
+to override it. The ready response and recording header include this configuration.
+An action can request 1-120 ticks; dive is pressed on its first tick only, while
+movement and fire are held. Actions stop early on any status change, including
+death or respawn. Responses include `ticksAdvanced`, an `observation`, and the
+latest frame filename when recording. Invalid commands return an `error`
+without advancing the simulation. EOF also closes the recording.
+
+For the explicit `--tap-fire` experiment, `fire: true` requests repeated
+press/release ticks instead of a held button. Movement remains held and dive
+is still pressed only once per action. The firing phase carries across action
+boundaries, including odd-length actions, and a non-firing tick releases it.
+Action logs contain the actual native inputs, so replay needs no special mode.
+Without the flag, held-fire behavior is unchanged.
+
+At Colin's Shop, observations include `shop.phase` (`sell` or `buy`), `busy`,
+the actual visible offers and sale prices, visit budget, purchase problems,
+and `legalActions`. Wait through entry/dialogue animation with neutral inputs
+until `shop.busy` is false, then choose a listed action:
+
+```json
+{"input":{},"ticks":4}
+{"command":"shop","action":"sell","slot":5}
+{"command":"shop","action":"exit"}
+{"command":"shop","action":"buy","id":3}
+{"command":"shop","action":"more"}
+{"command":"shop","action":"exit"}
+```
+
+These are phase-dependent examples, not a universally valid sequence.
+`exit` in selling finishes sales and opens buying; `exit` in buying leaves
+the shop. `more` is legal only when the cabinet offers another page.
+Transactions use the native selection, quotation, confirmation and animation
+flow, enforcing wallet, visit stock caps and equipment eligibility. Invalid
+choices do not advance time or consume RNG. JavaScript controllers use
+`run.shop({ action: "buy", id: 3 })`, etc.; the returned duration includes all
+required UI ticks, each recorded and optionally captured.
+
+Neutral inputs also advance death, loading, ending and high-score animations.
+`{"input":{"confirm":true},"ticks":1}` resumes Get Ready, accepts a continue, or
+confirms one high-score initial in the corresponding state. Low-level shop
+control is available as `{"input":{"activate":20},"ticks":1}` (cabinet indices
+0-19, exit 20, transaction confirmation 21). Confirm and activate are pulses,
+cannot be mixed with flight controls, and are rejected in the wrong phase.
+The game-over screen is terminal; the runner never restarts a new game.
+
+**Nothing advances between commands**, however long inference takes.
+Observations include player state, visible enemy/projectile/pickup bounds with
+stable per-run IDs, and a camera-aligned terrain grid. Coordinates are screen
+pixels, with X rightwards and Y downwards; the playable area is 320x192, with
+the HUD in the remaining eight image rows. Terrain rows contain twenty
+16-pixel cells: `1` means *some* collidable terrain is present, not that every
+pixel in the cell is solid. Pickup bounds are approximate. These are starter
+scene observations, not pixel-exact collision predictions or saved game states;
+they omit future spawns, offscreen enemies and internal AI/path state.
+Motion can be inferred by comparing IDs and positions across observations.
+`life` counts completed deaths; `continues` and `continueTicks` expose the
+remaining in-game continues and countdown.
+
+When stage one's boss is visibly entering, `boss.bounds` describes its drawn
+body even before its contact box activates. `boss.contactBounds` and
+`boss.weakPoint` are null until their current native geometry is active and
+visible. This does not expose offscreen spawns, future arm motion or boss
+health, and does not allocate another actor ID.
+
+Controllers written in JavaScript can also import the runner directly:
+
+```js
+import { createHeadlessRun } from "./tools/headless.mjs";
+
+const run = await createHeadlessRun({ seed: 42, capture: true, decisionTicks: 4 });
+try {
+  console.log(run.observe().observation);
+  const png = run.screenshot(); // PNG Buffer; taking a screenshot does not step.
+  const result = run.step({ right: true, fire: true }); // Uses decisionTicks.
+  console.log(png.length, result.observation);
+} finally {
+  run.close();
+}
+```
+
+Await model inference between `observe()` and `step()`. The optional second
+argument to `step(input, ticks)` overrides `decisionTicks` for that call.
+Use `capture: true` for in-memory screenshots, `output` to record every tick,
+`{ output, capture: false }` for action-only recording, or neither for pure
+simulation. The lower-level `HeadlessGame.step()` still defaults to one tick.
+
+### Real-time action replay
+
+The action log records movement, firing, diving, shop clicks and lifecycle
+confirmations, including how many simulation ticks each input actually ran. Replay reconstructs the whole
+game from the starting stage and RNG seed, rather than animating recorded
+ship coordinates. It does not require the LLM or the PNGs.
+
+To record inputs without screenshots:
+
+```sh
+node tools/headless.mjs --ticks 1100 --decision-ticks 4 \
+  --output captures/replay-demo --no-frames
+npm start
+```
+
+Open <http://127.0.0.1:8080/tools/replay.html>, select the local
+`captures/replay-demo/actions.jsonl`, and press **Play**. The viewer runs at
+the original gameplay tick rate, with **Pause** and **Restart** controls.
+Inference delays are omitted; changing the decision interval for later runs
+does not change an existing recording's timing. Files are read locally in the
+browser, not uploaded. Existing PNG captures' `actions.jsonl` files also work.
+
+Use the same game code and DOS assets as the original run. The viewer checks
+recorded player/run state, equipment, continues and shop state at action
+boundaries and reports divergence.
+Seeded replay is tested tick by tick; it is not a cross-version save-state
+format. Playback stops at the recording's end and makes no unrecorded menu
+choices. Version-two recordings include native shop and lifecycle animation
+timing and RNG consumption. Original unversioned/version-one flight-only
+recordings remain supported with their original stopping behavior.
+Audio recording is not implemented.
+
+### Foundry Local, including Windows from WSL
+
+The initial model controller sends JSON scene observations to Foundry Local's
+OpenAI-compatible chat-completions API. Each request includes energy/lives,
+named weapons and zero-based upgrade levels, movement/banking and ability
+timers, the last two compact scenes, and the last twelve actions and their
+outcomes. At four ticks per decision, that is about 2.64 seconds of compact
+action history; no additional older scenes are transmitted.
+Entity motion is measured in pixels per simulation tick; newly seen
+objects have unknown (`null`) velocity, not zero velocity. Future spawns and
+hidden enemy scripts are not exposed.
+
+Both controllers also send compact `feedback`, independent of the short scene
+history: time since reaching a new furthest-forward camera position, time
+without ship advance in world Y (to detect pushback despite scrolling), the last
+six distinct held-input segments with actual screen/world displacement, and
+the last four damage events with up to two nearby visible threats. Repeated
+identical inputs merge into one segment, so long stalls remain visible without
+repeating full scenes. Nearby threats are context, not an asserted damage cause.
+Feedback resets across life, shop and stage transitions, and is omitted in the
+shop. This is observation-derived memory, not automatic steering or hidden
+collision/pathfinding information.
+
+The flight prompt uses a strict priority order: preserve health and lives,
+collect supplies and power-ups, collect credit bubbles, then shoot enemies.
+A lower-priority objective does not justify taking avoidable damage. It
+encourages firing while steering safely and making level progress without
+reversing these priorities. Sealed containers are
+labelled `supply-pod` in `enemies`: shoot
+them open, then fly into the released `pickups` while surfaced. Ramming a pod
+costs energy. Credit globes fund Colin's Shop; reward drops grant equipment or
+abilities, but a generic `reward` observation does not reveal its particular
+effect. Reachable supplies take priority over bubbles and ordinary enemies,
+but pickups should be skipped when reaching them would predictably cost health.
+The rules explicitly distinguish safe collection from ramming a pod open,
+explain shooting from below and avoiding its path, and describe terrain's
+pushback/recovery behavior. A stalled corridor calls for a different route or
+a moving dive, while a visible boss can legitimately stop the scrolling.
+Terrain recovery can become fatal even with energy remaining; the model is
+told to stay submerged until clear rather than surfacing inside an obstruction.
+Dives are limited emergency resources, not the default way to avoid damage:
+ordinary evasive steering while firing comes first. Once clear, surfacing
+allows shooting and collection to resume. Last resort does not mean never:
+an emergency charge should save a ship when normal steering cannot. Gun kills,
+not collision kills, are the objective; routes to pods must also remain clear.
+The Decision action-selection
+question and candidate descriptions use these same priorities.
+
+Start Foundry Local and load a model using its Windows tools. Get the service's
+current endpoint and the loaded model's full ID; the port can change when the
+service restarts. See the [official CLI reference](https://learn.microsoft.com/azure/foundry-local/reference/reference-cli)
+for service status and model management.
+
+Windows-loopback services may not be reachable by Linux HTTP clients in WSL.
+Use `--transport windows-curl` to call Windows `curl.exe` from WSL instead:
+Windows performs the HTTP request to its own loopback address. This was tested
+without changing firewall rules or exposing the service to the network.
+`curl.exe` must be available on WSL's PATH. Replace `PORT` and `MODEL_ID` below
+with the values from your running service:
+
+```sh
+npm run play:foundry -- \
+  --endpoint http://127.0.0.1:PORT --model MODEL_ID \
+  --transport windows-curl --decision-ticks 4 --decisions 50 \
+  --output captures/foundry-run
+```
+
+Omit `--transport windows-curl` when native HTTP can reach the endpoint.
+The controller does not start the service, load/download models, or modify
+Windows networking. No API key, Azure deployment or additional SDK is needed.
+The output directory must be new. Add `--frames` to capture every gameplay tick
+as PNGs as well; PNG capture requires `npm ci`.
+
+By default the game stays paused during inference. Flight uses validated boolean controls
+for the configured tick interval; the model cannot override duration.
+`--decisions` bounds both flight and shop inference calls, and `--timeout-ms` sets their timeout
+(default 120000). Invalid, truncated or failed responses stop the run without
+applying that decision, rather than silently substituting another action.
+Small models can still produce invalid output; connectivity does not imply
+good gameplay.
+
+For first-life benchmarks, add `--stop-on-death` to either controller. It stops
+on the fatal gameplay tick, before death animation, respawn or spending a
+continue. The primary benchmark is now **furthest game progress**, ranked by
+campaign round, stage, then level fraction (`progress.furthest`). It records
+the start and final positions too, so backtracking cannot erase a reached
+checkpoint or earn credit again by oscillating. Native progress is tracked
+every tick, including between decisions. Health remaining and longest
+progress stall are diagnostics; remaining alive without new progress does
+not improve the score.
+The benchmark's level fraction uses a fixed camera range of 4608 to 0
+(`scene.levelProgress`), unlike the legacy `scene.progress` whose denominator
+can change when a miniboss releases the scrolling floor.
+The result and `benchmark.json` also retain `survivedTurns` (nonfatal flight
+decisions), the separate `fatalTurn`, ticks and simulated seconds.
+Shopping decisions do not count as flight turns. A decision-limit exit with
+`died: false` is only a lower bound on survival. Keep the seed, starting stage,
+decision interval and execution mode fixed when comparing runs; use paused
+mode with four ticks per decision for the current turn-based benchmark.
+Real-time counts refer to applied flight decisions, not fixed-duration turns,
+so compare ticks/time separately rather than mixing the two execution modes.
+
+Add `--collision-lookahead` for advisory movement forecasts. These project
+visible enemy/bullet bounds using measured linear velocities and the ship's
+free-flight steering, including speed and banking. Swept paths are checked
+with a four-pixel margin against threats. Terrain warnings instead use a
+visible hull-clearance grid, using measured camera motion. Each eight-pixel
+sample says whether the native surfaced collision hull fits with its centre
+there; this avoids treating every partly occupied 16-pixel rock tile as solid.
+Terrain gaps measure centre clearance to sampled blocked positions, not the
+enemy/bullet hull margin. The horizon covers two decision intervals,
+capped at 16 ticks; endpoints also show remaining clearance. Unknown-velocity
+threats are checked at their current bounds only and counted as uncertain.
+Unseen spawns, nonlinear motion, wall recovery, backtracking and dive immunity
+are not simulated; submerged bounds may understate the surfaced hull.
+These are geometric warnings, not guaranteed damage predictions or safe routes.
+The model retains every legal control and receives an explicit anticipatory
+health-preservation procedure. Without this flag, no forecast is added.
+Both controllers receive the clearance grid, exact current hull/rock overlap
+and native terrain-recovery state. Exact current overlap takes precedence over
+nearby clear samples in the forecast.
+
+With lookahead enabled, the Decision client also repeats each movement's
+existing forecast in its action descriptions, alongside whether the action
+retains, adds or gives up dive protection. Its instructions favour open
+interior maneuvering room when comparably safe and warn that unknown enemy
+velocity does not mean stationary. No legal controls are removed or overridden;
+the local JSON controller retains its shared forecast instructions.
+Safe pod opening and released-supply collection take precedence over extra
+empty clearance, recentering or faster scrolling once a route is safe.
+Instructions encourage a consistent supply target and firing line rather than
+unnecessary steering reversals. Sealed pods must still be shot open safely;
+they are not collectible until their drops appear.
+Both clients also repeat the current dive count, active-dive flag and timer in
+a `DIVE STATUS` reminder. Decision already excludes new-dive options when no
+charges remain. An active final dive can still continue without another
+charge, or end through a surface option; surfacing does not start a new dive.
+No automatic steering smoothing or control overrides are applied.
+Visible stage-one boss instructions distinguish its entrance from empty water,
+recommend a separated firing line below its weak point, and explain that its
+arms are indestructible. With collision forecasts and a forward shot equipped,
+Decision's firing options report action-end column alignment and horizontal
+error relative to the current weak point. This is advisory free-flight
+geometry, not a hit prediction, path guarantee or automatic aiming.
+Forecasts retain at least eight native ticks of lookahead when decisions are
+shortened, up to the existing sixteen-tick cap; finer controls do not discard
+the time needed to see an approaching threat and begin an escape.
+Recent actual displacement for the same movement direction is also repeated
+in Decision's option text. Instructions distinguish a connected detour from
+repeating a failed free-flight route. A brief retreat can create turning room
+when the hull is blocked, but should stop once the hull is clear and native
+recovery ends. At the bottom edge (`y=176`), Decision's DOWN options explicitly
+warn that they request reverse scrolling, not further downward screen movement;
+the same sideways direction without DOWN avoids that backtracking request. Ship
+progress feedback resets only at a new furthest world position, not on the
+forward half of an up/down oscillation. The clearance grid is sampled, not a
+path guarantee; it does not include enemies or predict native terrain recovery.
+
+Both controllers also receive explicit advisory `feedback.navigation` flags.
+`mapStalled` means less than eight pixels of new furthest camera progress over
+at least 32 native ticks (about 1.76 seconds); tiny advances do not hide a stall.
+`shipStalled` means no new furthest world-space ship position for 32 ticks.
+A bounded 64-tick observation history also identifies short position cycles
+repeated at least three times, using four-pixel position bins and banking.
+`requiresRecovery` highlights an active stall with a final navigation alert in
+the model instructions; Decision's implicated movement options carry cycle
+warnings too. Visible boss/miniboss combat suppresses the recovery alert, not
+the diagnostic flags. Histories reset between lives, stages and campaign
+rounds, and outside active flight. These signals do not select, filter or
+override controls. `recentCameraAdvance` measures actual net scrolling over
+the observation window, while `backtrackPixels` measures the current distance
+behind the furthest camera position. Positive net scrolling can be useful
+recovery even before an old high-water mark is exceeded; an old stall timer
+alone does not establish that the current hull is blocked.
+
+Both controllers now keep a bounded incident journal in `navigation-memory.json`.
+It records stage/campaign, horizontal position, world Y (`camera + ship Y`) and
+tick ranges for health loss, terrain loops and missed released supplies.
+Nearby incidents are supplied as advisory `feedback.nearbyIncidents` before
+the ship reaches them. Use `--navigation-memory PATH` to reuse a journal from
+an earlier attempt; this is prior experience, not a fresh-memory benchmark.
+Only previously visible supplies with a native uncollected-expiration outcome
+become missed-supply memories. Disappearance alone is not evidence of a miss,
+and collected drops or credit bubbles do not create these opportunity memories.
+They encourage a safe intercept, not avoidance; health remains the top priority.
+Native damage accounting retains a hit even if health is restored within the
+same decision. Journals hold at most 32 clustered incidents, with at most four
+nearby entries in a packet; replaying a known prefix does not duplicate its hits.
+
+When stalled or approaching a remembered terrain pocket, the model can select
+a visible-grid waypoint plan. Decision uses a second typed-choice question in
+the same request; the local client returns a validated `waypoint` alongside
+`input` when offered plans. Subsequent requests retain the selected world-space
+goal, independently of short action history. Plans end when reached, after 32
+ticks without waypoint progress, or after 128 ticks total. Failed plans are
+remembered locally. Connected clearance samples are advisory: they ignore
+enemies, do not predict native rewind, and never execute or filter controls.
+The model may select `manual` when a proposal is unsuitable.
+
+The initial waypoint-only trial from an already trapped 43.53% checkpoint did
+not escape: it chose `manual` throughout 120 fresh requests. The final
+pre-emptive trial started before that pocket, at 41.45%, seeded with incidents
+from the previously observed failed run. Over the same 640 native ticks
+(35.15 game seconds), it reached **53.52% versus 43.62%** for the stalled
+baseline, with zero native terrain-recovery ticks versus 223. It reached the
+midlevel shop and bought health, finishing the comparison with 31 health
+versus 11; that increase includes the purchase, not just damage avoidance.
+The complete 120-decision extension reached 53.91%. All 118 model requests,
+two sole-legal-action shop choices, native controls and 2,655 replay PNGs were
+verified. The [labelled terrain comparison](captures/decision-progress-v1/incident-memory-terrain-comparison.mp4)
+shows both trajectories at native speed.
+
+The session learning experiment also supports bounded
+health-loss/missed-supply -> save memory -> exact short rewind -> retry cycles.
+A learned opening retry collected a previously missed supply at tick 85,
+instead of letting it expire uncollected at tick 132. Native replay confirmed
+that both drops came from the same pod present before the rewind checkpoint.
+A subsequent eight-point hit at tick 288 generated another memory and a
+16-decision rewind. The next 80 fresh decisions (17.58 game seconds) incurred
+zero damage and no new missed supplies, retaining 39 health and all three
+dives. Three supplies were collected over the complete reconstructed
+trajectory; one was collected during that final retry. All 136 fresh requests,
+native controls and all 289/541 frames of the two attempts were verified.
+An earlier health-only experiment plateaued after three retries, still taking
+damage; the loop does not guarantee improvement.
+
+These are learned single-seed short passages, not fresh-game performance,
+generalization to other seeds, escape from an already trapped state or a level
+clear. Rewinds replay recorded controls without inference and preserve native
+pixels; they are training operations, not native extra lives or fresh-run
+scores. All fresh gameplay controls remain model-selected.
+
+Detecting a loop does not establish that the model can escape it. The initial
+alert wording was tested in a 60-decision live continuation from turn 620.
+That run reused 619 decisions without inference and delivered alerts in all
+60 fresh requests. Over the same
+13.18 game seconds, its peak progress was 41.28% versus 42.40% for the recorded
+baseline; both retained 31 health and two dives. The model instead backtracked,
+ending at 37.41% versus 42.32%. Request/control audits and all 2,717 native PNGs
+were verified: warning delivery works, but this trial is not a progress
+improvement or a demonstrated escape policy.
+
+The revised bottom-edge-aware instructions were then tested twice from that
+same checkpoint. Both reached the shop at **45.83%** within the same 240 native
+ticks (13.18 seconds), versus **42.40%** for the recorded baseline, preserving
+31 health and two dives. The complete repeat continued after shopping to
+**47.74%**, still with 31 health and two dives, before its 60-decision cap.
+That later endpoint is an extension, not an equal-time baseline comparison:
+shopping changes the native time consumed per decision. The repeat's 59 model
+requests and one sole-legal-action shop exit were audited, and all 2,889 native
+PNGs verified. These are resumed single-seed passage results, not a fresh-game
+or multi-seed benchmark.
+Local captures include a [matched-window comparison](captures/decision-progress-v1/held-turn-620-recovery-comparison.mp4)
+and the [complete improved passage](captures/decision-progress-v1/held-turn-620-recovery-improved.mp4).
+
+Further continuations of that saved trajectory reached **93.99% of stage 1's
+scrolling map** before the first death, at native tick 5205 (285.88 game
+seconds). This is not a level clear: camera progress does not include defeating
+the boss, and no end-level shop or stage transition occurred. Requests, native
+controls and replay PNGs were verified.
+The [complete first-life attempt](captures/decision-progress-v1/held-level-one-attempt.mp4)
+plays at native game speed.
+A short unknown-bullet-warning candidate from the identical 86.59% checkpoint
+died at 87.48%, versus 93.99% for the recorded continuation. That candidate was
+rejected; the better checkpoint policy was retained for those continuations.
+These remain resumed single-seed experiments, not fresh-game or multi-seed
+benchmarks.
+
+Using the next native life restored 39 health at the game's 75.35% checkpoint.
+With the same checkpoint policy, that second life reached **97.29%** before
+dying too. All 288 fresh requests, native controls and 6,373 replay PNGs were
+verified; no continues were spent. This does not improve the first-life score
+or establish a level clear.
+The [second-life passage](captures/decision-progress-v1/held-level-one-second-life.mp4)
+shows the native respawn checkpoint through the final hit at real game speed.
+
+**Earlier fresh-game check:** Before the pickup/history revisions below,
+applying the checkpoint policy from decision one, with zero replayed decisions
+and the same `0x5845` seed, reached **28.97%**
+before the first death during decision 362 (79.42 game seconds). All three
+dives had been used. All 362 actual model requests, native controls and 1,447
+replay PNGs were verified.
+The [complete fresh attempt](captures/decision-progress-v1/fresh-stage-one-attempt.mp4)
+plays at native speed. The resumed 93.99-97.29% results therefore must not be
+presented as demonstrated fresh-game performance of the current instructions.
+
+A later revision prioritizes safe supply acquisition, conservative purposeful
+steering and twelve compact action outcomes instead of three. It was compared
+against the first 640 native ticks (35.15 seconds) of that fresh recording,
+using 160 entirely fresh model decisions with the same seed and held-fire
+cadence:
+
+| Metric | Earlier policy | Pickup/history revision |
+| --- | --- | --- |
+| Supplies collected without ramming | 2 | 3 |
+| Health remaining | 31 | 39 |
+| Dive charges remaining | 3 | 3 |
+| Up/down command reversals | 63 | 34 |
+| Actual vertical direction reversals | 68 | 51 |
+| Furthest map progress | 13.24% | 13.02% |
+
+This is not a full-run improvement claim or an isolated test of history
+length. The revised ship acquired speed level 2 instead of 0, and travelled
+more vertical pixels overall (1,954 versus 1,612), despite reversing less.
+Loadouts also differ: both have forward-shot upgrade level 1, but only the
+earlier passage has a rear gun. More pickups do not establish an unambiguously
+stronger loadout. A stricter horizontal-steering preference was also tested;
+it collected no supplies and ended with 23 health, so it was rejected.
+All 160 retained-trial requests, 640 actual model-control ticks and 641 native
+PNGs were verified.
+The [labelled side-by-side comparison](captures/decision-progress-v1/pickup-conservative-history-comparison.mp4)
+shows the earlier policy on the left and the retained pickup/history revision
+on the right at native game speed.
+
+A full fresh-start test of that exact pickup/history revision reached **43.62%**
+of stage 1's scrolling map, versus the earlier fresh run's 28.97%. It remained
+alive at the 1,600-decision cap (351.52 game seconds), with 11 health, no dives
+and three supplies collected without ramming pods. However, it made no new
+forward progress for the final **232.66 seconds**, repeatedly cycling against
+terrain despite receiving navigation alerts. This is a capped, stalled attempt,
+not a level clear or a measured time to first death. At the earlier run's fatal
+tick (79.42 seconds), the revision was still alive with 19 health and three
+supplies, versus zero health and two supplies. Loadouts still differ.
+The same `0x5845` seed, native mechanics, four-tick decisions and held-fire
+cadence were used, with zero replayed decisions. All 1,600 actual requests,
+6,400 model-control ticks and 6,401 replay PNGs were verified.
+The [complete revised-policy test](captures/decision-progress-v1/fresh-pickup-history-full-test.mp4)
+plays at native speed; its long stalled tail is intentionally retained.
+
+**Learned checkpoint completion:** A later trained trajectory defeated stage
+one's boss and reached the native end-level shop with `nextStage: 2`, 35 health,
+two completed deaths and no continues spent. The final retry replayed 2,089
+prior model decisions without inference, then made 269 fresh one-tick
+decisions, taking no further damage. All 269 requests and native controls were
+audited, and all 7,467 PNGs matched deterministic replay. Boss death and zero
+remaining boss health were independently verified; this is a real stage clear,
+not just 100% camera progress, but it is checkpoint-trained performance.
+The [boss-clear clip](captures/decision-progress-v1/learned-stage-one-clear-boss.mp4)
+and [full reconstructed trajectory](captures/decision-progress-v1/learned-stage-one-clear-full.mp4)
+are labelled accordingly, play at native speed and include a three-second
+final-frame hold.
+
+**Fresh start with learned memory:** A separate tick-zero test loaded 32
+previously observed incidents, with normal starting health, equipment, three
+lives and three dives, and zero replayed decisions. The first request
+contained the prior missed-supply warning and empty action history. It lost
+its first life at 14.84% and peaked at **22.16%** across all three native lives
+before stopping at the continue prompt, with both continues unspent. It
+collected two weapon-released supplies, made no pod contacts and did not clear
+the level. All 396 model requests, native controls and 1,650 PNGs were verified.
+The [complete fresh-memory attempt](captures/decision-progress-v1/fresh-memory-stage-one-attempt.mp4)
+is separately labelled and plays at native speed, followed by a three-second
+final-frame hold. The checkpoint clear therefore has not generalized to a
+fresh-memory run; these results must not be presented as a fresh-game clear.
+
+An earlier Decision instruction checkpoint emphasized acting before contact:
+enemy hits can repeat on consecutive ticks, and contact is checked before
+steering or activating a new dive. It survived 588 nonfatal turns, dying during
+turn 589 after 129.35 game seconds, versus 346 turns for the original lookahead
+prompt and 512 for the preceding checkpoint. These are historical results,
+before the progress/terrain-navigation revisions; the alert continuation above
+is a separate short-passage comparison. Comparisons used stage 1, seed
+`0x5845`, four ticks per decision and paused inference. The 588-turn checkpoint still
+stalled near a rocky corridor (11.20 seconds without new forward progress,
+versus 2.20 previously) and reached slightly less of the level, so the survival
+record is not an across-the-board gameplay improvement. This is a single-seed
+result, not evidence of real-time performance or generalization to other seeds.
+
+Add `--tap-fire` to either model controller for a separate rapid-tapping
+experiment. Only requested firing is pulsed; steering, dive choices, model
+instructions, decision duration and native weapon cooldowns are unchanged.
+The manifest, action header and first-death benchmark mark `tapFire: true`.
+Decision history records the model's firing intent; action logs record every
+actual press/release. Compare this mode separately from instruction-only
+benchmarks. It currently requires paused inference and cannot be combined
+with `--realtime`. Release-sensitive weapons can behave differently under
+tapping; faster basic-gun firing is not a guarantee of better survival.
+
+In the initial same-seed comparison, both tapping and a fresh held-fire control
+were still alive at the 900-turn cap (197.73 seconds), so their lifespans remain
+unknown. Tapping collected more drops and shot more enemies, but reached 34.94%
+of the level with 3 health versus the control's 42.36% with 7 health; it is not
+the default. Both runs used per-tick recording while firing: finer observation
+can assign visible actor IDs earlier, so the historical 588-turn recording is
+not a fully matched control for this experiment.
+
+Add `--realtime` to either model controller to keep the game ticking at its
+normal 18.2 Hz while inference runs. Controls start neutral, then the previous
+movement/fire buttons stay held until the next valid reply; dive remains a
+single press. There is only one request in flight. `--decision-ticks` becomes
+the minimum interval between observations, not a guaranteed action duration.
+The model is told about the delay and current held buttons. Death, shop and
+stage transitions clear held controls and invalidate replies from the old
+context; expired dive/surface decisions are also discarded. Invalid replies
+and API failures still stop the run, but elapsed game ticks are not undone.
+Discarded requests count toward `--decisions`, so stale replies cannot cause
+unbounded extra inference calls. Outstanding requests are cancelled on exit.
+
+Real-time decision logs include `requestedAtTick`, `receivedAtTick` and
+`appliedAtTick`. History records the actual input changes during each observed
+interval. Per-tick action logs, PNGs and replay include the gameplay that
+happened during inference, rather than removing those delays. Shop clicks
+and animations also use the normal clock. After the decision limit, the last
+flight controls run for one configured interval, or the final shop transaction
+finishes. Real-time results report controller wall time and simulated seconds;
+capture/CPU overhead can still make a machine fall behind its target clock.
+
+For DeepSeek R1-style reasoning models, add `--reasoning`. This keeps all
+instructions in one user message, uses temperature 0.6 and raises the output
+budget from 128 to 1024 tokens. Override either budget with `--max-tokens N`.
+Only a complete leading `<think>...</think>` block is separated from the final
+answer; the final flight or shop JSON still passes the same strict validation.
+Separate `reasoning_content` is also retained when supplied by the service.
+Unclosed/misplaced reasoning and token-limit truncation stop without applying
+controls. Input and output must fit the loaded model's context window; the
+cached DeepSeek 14B NPU variant has a 4096-token context.
+
+`decisions.jsonl` records scene packets, model replies, inference latency and
+errors, including raw content and separated reasoning in reasoning mode.
+`actions.jsonl` records the actual controls and tick counts and works
+with the real-time replay viewer above, without inference delays. Optional
+PNGs can be assembled into video using the same FFmpeg command.
+
+At Colin's Shop, the model receives a separate shopping prompt and chooses
+one `scene.shop.legalActions` entry in a `{"shop":{...}}` response:
+`{"shop":{"action":"buy","id":3}}`, `{"shop":{"action":"sell","slot":5}}`,
+`{"shop":{"action":"more"}}`, or `{"shop":{"action":"exit"}}`.
+Only actual offers are exposed, with stage-specific prices, sale proceeds,
+budget and equipment constraints. Each transaction completes its native UI
+animation before another decision; the four-tick flight interval does not
+truncate shop dialogue. Shopping cannot bypass stock restrictions.
+
+After the player is killed, the controller records the death animation and automatically
+resumes at Get Ready using the game's own checkpoint, equipment and credit
+restoration rules. It also confirms the default high-score initials and uses
+available in-game continues, recording every confirmation. Use `--no-continue`
+to stop at the continue prompt instead. Game over stops the run, without an
+automatic restart. Stage-loading and victory sequences run normally.
+These lifecycle transitions do not call the LLM or spend its decision budget.
+Flight motion history resets across death, shop and stage transitions rather
+than treating respawn or camera jumps as object velocity.
+
+### Microsoft Decision 1.1 in Foundry
+
+The cloud controller uses an existing
+[Microsoft Decision 1.1 deployment](https://learn.microsoft.com/azure/foundry/foundry-models/how-to/use-foundry-models-microsoft-decision).
+It shares the Xenon 2: Megablast gameplay rules, scene history, shop/lifecycle
+handling and recording format with the local controller. Rather than generating
+JSON, the model selects a labelled action with calibrated probability scores.
+Flight options contain only valid movement combinations and available dive or
+surface controls; shop options come directly from the actual legal actions.
+A sole legal shop action is applied locally and explicitly marked `forced`,
+without inventing model confidence or making a billable request.
+
+Set `AZURE_DECISION_API_KEY` securely in the environment, then run:
+
+```sh
+npm run play:decision -- \
+  --endpoint https://RESOURCE.services.ai.azure.com/providers/microsoft/v1/systemone \
+  --model DEPLOYMENT_NAME --decision-ticks 4 --decisions 30 --frames \
+  --output captures/decision-run
+```
+
+The deployment name is not necessarily the underlying model name. HTTPS is
+required except for loopback tests. Requests time out after 30000 ms by default;
+override with `--timeout-ms N`. HTTP errors, unknown action labels and malformed
+probabilities stop without applying controls. Credentials are sent only in the
+authentication header, never put in recordings, and redirects are not followed.
+Only the supplied scene and gameplay rules are sent to the hosted model.
+This makes paid inference requests; no Azure resources or deployments are created.
+Unset the key when finished. PNGs and real-time replay work as described above.
+
 ## 🎮 Controls
 
 Press **Enter** or **Space**, or tap the title screen, to open the menu.
@@ -424,14 +1082,16 @@ from DOS. See [the remaining work](PLAN.md) for the development checklist.
 ## Validate
 
 ```sh
+npm ci
 npm test
 npm run check
 ```
 
-`npm test` requires the local DOS files listed above. GitHub Actions runs
-syntax checks and the Python audio tests without game files; cases that need
-the Amiga archive or extracted effects are skipped on a fresh checkout. To
-run the same Python test command locally:
+`npm test` requires the local DOS files listed above; capture tests also use the
+development Canvas dependency. GitHub Actions runs syntax checks, asset-independent
+packaging/headless tests, and the Python audio tests without game files.
+Headless capture cases and Python cases that need the Amiga archive or extracted
+effects are skipped on a fresh checkout. To run the same Python test command locally:
 
 ```sh
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s test -p 'amiga_test.py' -v
